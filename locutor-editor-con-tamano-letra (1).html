@@ -1,0 +1,249 @@
+
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>App de Locución - Funciones Avanzadas</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 1rem;
+      background-color: #f0f0f0;
+    }
+    #container {
+      position: relative;
+      margin-top: 1rem;
+    }
+    #editor {
+      width: 100%;
+      height: 300px;
+      font-size: 18px;
+      padding: 1rem;
+      box-sizing: border-box;
+      background: white;
+      z-index: 0;
+      position: relative;
+    }
+    canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+      pointer-events: none;
+    }
+    .tools {
+      margin-top: 1rem;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+    select, button {
+      padding: 0.5rem;
+      font-size: 14px;
+      border-radius: 5px;
+      border: none;
+      cursor: pointer;
+    }
+    audio {
+      margin-top: 1rem;
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+
+<h2>App de Locución - Funciones Avanzadas</h2>
+<p>Pega tu texto, edítalo visualmente, graba, comparte.</p>
+
+<textarea id="editor" placeholder="Pega aquí tu texto..."></textarea>
+<div id="container">
+  <canvas id="canvas"></canvas>
+</div>
+
+<div class="tools">
+  
+<select id="fontSizeSelector" onchange="changeFontSize()">
+  <option value="16px">Letra pequeña</option>
+  <option value="20px" selected>Letra normal</option>
+  <option value="24px">Letra grande</option>
+  <option value="30px">Letra muy grande</option>
+</select>
+
+  <select id="pincel-negro">
+    <option value="2">Pincel negro fino</option>
+    <option value="5">Medio</option>
+    <option value="10">Grueso</option>
+  </select>
+  <button onclick="startDraw('black', 'pincel-negro')">🖌️ Pincel negro</button>
+
+  <select id="pincel-rojo">
+    <option value="2">Pincel rojo fino</option>
+    <option value="5">Medio</option>
+    <option value="10">Grueso</option>
+  </select>
+  <button onclick="startDraw('red', 'pincel-rojo')">🖌️ Pincel rojo</button>
+
+  <select id="rotu-grosor">
+    <option value="5">Rotulador fino</option>
+    <option value="10">Medio</option>
+    <option value="20">Grueso</option>
+  </select>
+  <button onclick="startDraw('lime', 'rotu-grosor')">🖍️ Rotulador verde</button>
+
+  <button onclick="insertArrow('🔺 Ascendente')">🔺 Ascendente</button>
+  <button onclick="insertArrow('🔻 Descendente')">🔻 Descendente</button>
+  <button onclick="insertArrow('➡️ Medio')">➡️ Medio</button>
+  <button onclick="insertArrow('⬇️ Bajo')">⬇️ Bajo</button>
+  <button onclick="insertArrow('⏺ Neutro')">⏺ Neutro</button>
+
+  <button onclick="startDraw('white')">🧽 Borrador</button>
+  <button onclick="undo()">↩️ Deshacer</button>
+  <button onclick="redo()">↪️ Rehacer</button>
+  <button onclick="stopDraw()">✋ Detener dibujo</button>
+  <button onclick="shareText()">📤 Compartir texto</button>
+  
+</div>
+
+
+
+<script>
+  const canvas = document.getElementById('canvas');
+  const editor = document.getElementById('editor');
+  const ctx = canvas.getContext('2d');
+  let drawing = false;
+  let color = 'black';
+  let lineWidth = 2;
+  let paths = [];
+  let undonePaths = [];
+
+  function resizeCanvas() {
+    canvas.width = editor.offsetWidth;
+    canvas.height = editor.offsetHeight;
+  }
+
+  function startDraw(col, sizeId) {
+    color = col;
+    lineWidth = parseInt(document.getElementById(sizeId).value);
+    canvas.style.pointerEvents = 'auto';
+  }
+
+  function stopDraw() {
+    drawing = false;
+    canvas.style.pointerEvents = 'none';
+  }
+
+  canvas.addEventListener('mousedown', (e) => {
+    drawing = true;
+    ctx.beginPath();
+    ctx.moveTo(e.offsetX, e.offsetY);
+    paths.push([{ x: e.offsetX, y: e.offsetY, color, lineWidth }]);
+  });
+
+  canvas.addEventListener('mousemove', (e) => {
+    if (drawing) {
+      const path = paths[paths.length - 1];
+      path.push({ x: e.offsetX, y: e.offsetY, color, lineWidth });
+      redraw();
+    }
+  });
+
+  canvas.addEventListener('mouseup', () => {
+    drawing = false;
+  });
+
+  function redraw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (const path of paths) {
+      ctx.beginPath();
+      for (let i = 0; i < path.length; i++) {
+        const p = path[i];
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = p.lineWidth;
+        ctx.lineCap = 'round';
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+    }
+  }
+
+  function undo() {
+    if (paths.length > 0) {
+      undonePaths.push(paths.pop());
+      redraw();
+    }
+  }
+
+  function redo() {
+    if (undonePaths.length > 0) {
+      paths.push(undonePaths.pop());
+      redraw();
+    }
+  }
+
+  function insertArrow(symbol) {
+    const start = editor.selectionStart;
+    const end = editor.selectionEnd;
+    const text = editor.value;
+    editor.value = text.substring(0, start) + symbol + text.substring(end);
+    editor.focus();
+    editor.selectionStart = editor.selectionEnd = start + symbol.length;
+  }
+
+  function shareText() {
+    const text = editor.value;
+    if (navigator.share) {
+      navigator.share({
+        title: 'Texto locutado con efectos',
+        text: text
+      }).catch(err => alert('Error al compartir: ' + err));
+    } else {
+      alert('Tu navegador no admite compartir directamente.');
+    }
+  }
+
+  
+
+  async  {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+    }
+  }
+
+  function playRecording() {
+    const audio = document.getElementById('recordedAudio');
+    if (audio.src) audio.play();
+  }
+
+  function shareAudio() {
+    if (!audioBlob) {
+      alert('Graba primero un audio para poder compartirlo.');
+      return;
+    }
+
+    const file = new File([audioBlob], 'grabacion.webm', { type: 'audio/webm' });
+
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({
+        files: [file],
+        title: 'Grabación de locución'
+      }).catch(err => alert('No se pudo compartir el audio: ' + err));
+    } else {
+      alert('Tu navegador no permite compartir archivos de audio.');
+    }
+  }
+
+  window.addEventListener('resize', resizeCanvas);
+  window.addEventListener('load', resizeCanvas);
+
+function changeFontSize() {
+  const size = document.getElementById('fontSizeSelector').value;
+  document.getElementById('editor').style.fontSize = size;
+}
+
+</script>
+
+</body>
+</html>
